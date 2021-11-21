@@ -1,0 +1,51 @@
+version: "3"
+
+services:
+  janusgraph:
+    image: docker.io/janusgraph/janusgraph:latest
+    container_name: jce-janusgraph
+    volumes:
+      - ./janus-cassandra.groovy:/docker-entrypoint-initdb.d/janus-cassandra.groovy
+      - ./air-routes.graphml:/mydata/air-routes.graphml
+    environment:
+      JANUS_PROPS_TEMPLATE: cql
+      janusgraph.storage.hostname: jce-scylla 
+    ports:
+      - "8182:8182"
+    networks:
+      - jce-network
+    healthcheck:
+      test: ["CMD", "bin/gremlin.sh", "-e", "scripts/remote-connect.groovy"]
+      interval: 10s
+      timeout: 30s
+      retries: 3
+
+  scylla:
+    image: scylladb/scylla
+    container_name: jce-scylla
+    networks:
+      - jce-network
+
+  invana-engine:
+    image: invanalabs/invana-engine
+    container_name: invana-jce-invana-engine-1
+    restart: always
+    ports:
+      - "8200:8200"
+    environment:
+      - GREMLIN_SERVER_URL=ws://jce-janusgraph:8182/gremlin
+    networks:
+      - jce-network
+
+  invana-studio:
+    image: invanalabs/invana-studio
+    container_name: invana-jce-invana-studio-1
+    ports:
+      - "8300:8300"
+    networks:
+      - jce-network
+
+networks:
+  jce-network:
+volumes:
+  janusgraph-default-data:
